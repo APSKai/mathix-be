@@ -5,6 +5,7 @@ import { Request, Response } from 'express'
 import admin from '@/configs/firebase'
 import { AuthRequest } from '@/middleware/auth'
 import { IUser } from '@/types/user'
+import { firestoreTimestampToISOString } from '@/utils/format'
 
 class AuthController {
     static register = async (req: Request, res: Response) => {
@@ -62,7 +63,6 @@ class AuthController {
             return res.status(201).json({
                 status: true,
                 message: 'Register successfully',
-                user,
             })
         } catch (error: any) {
             console.log(error)
@@ -111,7 +111,6 @@ class AuthController {
             return res.status(200).json({
                 status: true,
                 message: 'Login successfully',
-                user: userDoc.data(),
                 accessToken: response.data.idToken,
                 refreshToken: response.data.refreshToken,
                 expiresIn: response.data.expiresIn,
@@ -143,7 +142,21 @@ class AuthController {
 
             return res.json({
                 status: true,
-                user: userDoc.data(),
+                user: {
+                    uid: userDoc.data()?.uid,
+                    username: userDoc.data()?.username,
+                    fullName: userDoc.data()?.fullName,
+                    email: userDoc.data()?.email,
+                    role: userDoc.data()?.role,
+                    verify: userDoc.data()?.verify,
+                    avatar: userDoc.data()?.avatar,
+                    createdAt: firestoreTimestampToISOString(
+                        userDoc.data()?.createdAt
+                    ),
+                    updatedAt: firestoreTimestampToISOString(
+                        userDoc.data()?.updatedAt
+                    ),
+                },
             })
         } catch (error: any) {
             return res.status(500).json({
