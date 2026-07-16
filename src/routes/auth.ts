@@ -7,7 +7,8 @@ const router = express.Router()
 
 router.post('/login', AuthController.login)
 router.post('/register', AuthController.register)
+router.post('/refresh', AuthController.refresh)
 router.get('/me', AuthMiddleware('user'), AuthController.me)
-router.get('/logout', AuthMiddleware('user'), AuthController.logout)
+router.post('/logout', AuthMiddleware('user'), AuthController.logout)
 
 export default router
