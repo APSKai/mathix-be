@@ -57,7 +57,9 @@ export const cache = (options: RedisCacheOptions) => {
 
             if (canStore) {
                 const payload: CachedResponse = {
-                    body: Buffer.isBuffer(body) ? body.toString('utf8') : String(body),
+                    body: Buffer.isBuffer(body)
+                        ? body.toString('utf8')
+                        : String(body),
                     contentType,
                     statusCode: res.statusCode,
                 }
@@ -68,10 +70,7 @@ export const cache = (options: RedisCacheOptions) => {
                         console.warn(`[cache] write failed: ${error.message}`)
                     )
 
-                res.setHeader(
-                    'Cache-Control',
-                    `public, max-age=${ttlSeconds}`
-                )
+                res.setHeader('Cache-Control', `public, max-age=${ttlSeconds}`)
             }
 
             return originalSend(body)

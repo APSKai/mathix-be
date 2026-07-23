@@ -5,12 +5,13 @@ import type { Express, Request, Response } from 'express'
 import express from 'express'
 import { createServer } from 'http'
 
+import connectDB from '@/configs/database'
+import { getRateLimitPolicies } from '@/configs/rateLimit'
 import { cache } from '@/middleware/cache'
-import { rateLimit } from '@/middleware/rateLimit'
+import { createRateLimitMiddleware } from '@/middleware/rateLimit'
 import routes from '@/routes'
 import { getPublicCacheTtl, isPublicCachePath } from '@/utils/cache'
-import { isAllowedOrigin, isApiOptionsRequest } from '@/utils/cors'
-import { getEnvNumber } from '@/utils/get'
+import { isAllowedOrigin } from '@/utils/cors'
 
 if (process.env.NODE_ENV !== 'production') {
     dotenv.config()
@@ -20,22 +21,6 @@ const PORT: number = Number(process.env.PORT) || 4000
 const HOST_NAME: string = process.env.URL || 'localhost'
 
 const app: Express = express()
-
-const formatRoutePath = (routePath: unknown): string => {
-    if (typeof routePath === 'string') {
-        return routePath
-    }
-
-    if (routePath instanceof RegExp) {
-        return routePath.toString()
-    }
-
-    if (Array.isArray(routePath)) {
-        return routePath.map(formatRoutePath).join('|')
-    }
-
-    return 'unknown'
-}
 
 app.use(
     cors({
@@ -59,41 +44,18 @@ app.use(
             'Range',
         ],
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        exposedHeaders: [
+            'RateLimit-Policy',
+            'RateLimit-Limit',
+            'RateLimit-Remaining',
+            'RateLimit-Reset',
+            'Retry-After',
+        ],
         credentials: true,
     })
 )
 
-app.use(
-    '/api/v1',
-    rateLimit({
-        name: 'api',
-        windowMs: getEnvNumber('RATE_LIMIT_API_WINDOW_MS', 60000),
-        max: getEnvNumber('RATE_LIMIT_API_MAX', 600),
-        skip: isApiOptionsRequest,
-    })
-)
-app.use(
-    '/api/v1/auth',
-    rateLimit({
-        name: 'auth',
-        windowMs: getEnvNumber('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000),
-        max: getEnvNumber('RATE_LIMIT_AUTH_MAX', 30),
-        skip: isApiOptionsRequest,
-    })
-)
-
-app.use(
-    '/api/v1',
-    rateLimit({
-        name: 'write',
-        windowMs: getEnvNumber('RATE_LIMIT_WRITE_WINDOW_MS', 60000),
-        max: getEnvNumber('RATE_LIMIT_WRITE_MAX', 120),
-        skip: (req) =>
-            isApiOptionsRequest(req) ||
-            req.method === 'GET' ||
-            req.method === 'HEAD',
-    })
-)
+app.use('/api/v1', createRateLimitMiddleware(getRateLimitPolicies()))
 
 const httpServer = createServer(app)
 
@@ -127,6 +89,14 @@ app.use(
 )
 app.use('/api/v1', routes)
 
-httpServer.listen(PORT, HOST_NAME as any, () => {
-    console.info(`Server running on ${HOST_NAME}:${PORT}`)
+const start = async () => {
+    await connectDB()
+    httpServer.listen(PORT, HOST_NAME as any, () => {
+        console.info(`Server running on ${HOST_NAME}:${PORT}`)
+    })
+}
+
+start().catch((error) => {
+    console.error('Server startup failed', error)
+    process.exit(1)
 })
